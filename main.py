@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import sys
 import jwt
 from sqlalchemy import delete, insert
-from config import SERIAL, URL_AUTH, URL_TOKEN
+from config import SERIAL, URL_AUTH, URL_TOKEN, STORE
 from config import LOGGER as log
 from models import Token
 from database import session_maker
@@ -41,7 +41,7 @@ def get_token():
     CADES_BES = 1
     CAPICOM_ENCODE_BASE64 = 0
     CAPICOM_CURRENT_USER_STORE = 2
-    CAPICOM_MY_STORE = 'My'
+    CAPICOM_MY_STORE = STORE
     CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
 
     sSerialNumber = SERIAL
