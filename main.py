@@ -7,7 +7,7 @@ import sys
 import jwt
 from sqlalchemy import delete, insert
 from config import SERIAL, URL_AUTH, URL_TOKEN, STORE
-from config import LOGGER as log
+from logger import log, cleanup_logs, logs_path
 from models import Token
 from database import session_maker
 
@@ -36,7 +36,7 @@ def get_token_info(token: str, token_info: dict):
 
 
 def get_token():
-    log.info(f'CZ. Start - {datetime.now()}')
+    log.info(f'CZ. Start')
 
     CADES_BES = 1
     CAPICOM_ENCODE_BASE64 = 0
@@ -46,6 +46,7 @@ def get_token():
 
     sSerialNumber = SERIAL
 
+    log.info(f'Auth {URL_AUTH}')
     headers = {'accept': 'application/json'}
 
     response = requests.get(URL_AUTH, headers=headers)
@@ -53,7 +54,7 @@ def get_token():
     status = response.status_code
 
     if status != 200:
-        log.error(f'Error. Status code {status}. URL {URL_AUTH}')
+        log.error(f'Auth error. Status code {status}. URL {URL_AUTH}')
         sys.exit()
 
     content = json.loads(response.content)
@@ -62,40 +63,51 @@ def get_token():
 
     encoded_data = base64.b64encode(data.encode('ascii'))
 
-    oStore = win32com.client.Dispatch("CAdESCOM.Store")
-    oStore.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
-    oCert = ''
-    for val in oStore.Certificates:
-        if val.SerialNumber == sSerialNumber:
-            oCert = val
-    oStore.Close
+    try:
+        log.info(f'Getting certificate {sSerialNumber} in store {STORE}')
+        oStore = win32com.client.Dispatch("CAdESCOM.Store")
+        oStore.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+        oCert = ''
+        for val in oStore.Certificates:
+            if val.SerialNumber == sSerialNumber:
+                oCert = val
+        oStore.Close
+        log.info(f'Get certificate {sSerialNumber}')
+    except Exception as e:
+        log.error(f"Error getting certificate {sSerialNumber} in store {STORE}")
 
-    oCPSigner = win32com.client.Dispatch("CAdESCOM.CPSigner")
-    oSignedData = win32com.client.Dispatch("CAdESCOM.CadesSignedData")
 
-    oCPSigner.Certificate = oCert
-    oSignedData.ContentEncoding = 1
+    try:
+        log.info(f'Signing data with certificate {sSerialNumber}')
+        oCPSigner = win32com.client.Dispatch("CAdESCOM.CPSigner")
+        oSignedData = win32com.client.Dispatch("CAdESCOM.CadesSignedData")
 
-    base64_message = encoded_data.decode('ascii')
-    oSignedData.Content = base64_message
+        oCPSigner.Certificate = oCert
+        oSignedData.ContentEncoding = 1
 
-    sSignedData = oSignedData.SignCades(oCPSigner, CADES_BES, False, CAPICOM_ENCODE_BASE64)
+        base64_message = encoded_data.decode('ascii')
+        oSignedData.Content = base64_message
 
-    headers = {'accept': 'application/json',
-               'Content-Type': 'application/json'
-               }
+        sSignedData = oSignedData.SignCades(oCPSigner, CADES_BES, False, CAPICOM_ENCODE_BASE64)
 
-    params = {
-        'uuid': content['uuid'],
-        'data': sSignedData
-    }
+        headers = {'accept': 'application/json',
+                   'Content-Type': 'application/json'
+                   }
 
+        params = {
+            'uuid': content['uuid'],
+            'data': sSignedData
+        }
+    except Exception as e:
+        log.error(f'Error signing data: {e}')
+    
+    log.info(f'Getting token {URL_TOKEN}')
     response = requests.post(URL_TOKEN, headers=headers, json=params)
 
     status = response.status_code
 
     if status != 200:
-        log.error(f'Error. Status code {status}. URL {URL_TOKEN}')
+        log.error(f'Error geting token {status}. URL {URL_TOKEN}')
         sys.exit()
 
     content = json.loads(response.content)
@@ -103,13 +115,21 @@ def get_token():
     token_info = {
         'jwt_token': content['token']
     }
+    try:
+        log.info("Getting info from JWT")
+        get_token_info(token_info['jwt_token'], token_info)
+    except Exception as e:
+        log.error(f"Error while reading JWT: {e}")
 
-    get_token_info(token_info['jwt_token'], token_info)
+    try:
+        log.info("Saving info in database")
+        save_token(token_info)
+    except Exception as e:
+        log.error("Error saving info in database: {e}")
 
-    save_token(token_info)
-
-    log.info(f'CZ. Stop -  {datetime.now()}')
+    log.info(f'Finish')
 
 
 if __name__ == '__main__':
     get_token()
+    cleanup_logs(logs_path)
