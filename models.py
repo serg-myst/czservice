@@ -12,3 +12,4 @@ class Token(Base):
     inn = Column(String(12))
     mchd_id = Column(String(12))
     expiration_date = Column(DateTime)
+    token_type = Column(String(3), unique=True)
