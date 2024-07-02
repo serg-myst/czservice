@@ -7,7 +7,6 @@ import sys
 import jwt
 from sqlalchemy import delete, insert
 from config import SERIAL, URL_AUTH, URL_TOKEN, STORE, URL_AUTH_SUZ, URL_TOKEN_SUZ, OMSID
-from config import LOGGER as log
 from logger import log, cleanup_logs, logs_path
 from models import Token
 from database import session_maker
