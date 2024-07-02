@@ -148,7 +148,7 @@ def get_token(token_type: int):
         log.info("Saving info in database")
         save_token(token_info)
     except Exception as e:
-        log.error("Error saving info in database: {e}")
+        log.error(f"Error saving info in database: {e}")
 
     log.info(f'CZ. Stop -  {datetime.now()}. TYPE {token_type}')
 
