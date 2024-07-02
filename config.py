@@ -18,9 +18,4 @@ try:
     DB_USER = os.environ.get('DB_USER')
     DB_PASS = os.environ.get('DB_PASS')
 except Exception as e:
-    log.error(f"Error getting vars: {e}")    
-
-FILE_LOG = 'cz_service.log'
-logging.basicConfig(level=logging.INFO, filename=FILE_LOG,
-                    format="%(asctime)s %(levelname)s %(message)s", encoding='utf-8')
-LOGGER = logging.getLogger('cz_service')
+    log.error(f"Error getting vars: {e}")
