@@ -5,9 +5,12 @@ import logging
 load_dotenv()
 
 SERIAL = os.environ.get('serial')
+OMSID = os.environ.get('omsId')
 STORE = os.environ.get('store')
 URL_AUTH = os.environ.get('url_auth')
+URL_AUTH_SUZ = os.environ.get('url_auth_suz')
 URL_TOKEN = os.environ.get('url_token')
+URL_TOKEN_SUZ = os.environ.get('url_token_suz')
 DB_HOST = os.environ.get('DB_HOST')
 DB_PORT = os.environ.get('DB_PORT')
 DB_NAME = os.environ.get('DB_NAME')
