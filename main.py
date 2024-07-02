@@ -8,6 +8,8 @@ import jwt
 from sqlalchemy import delete, insert
 from config import SERIAL, URL_AUTH, URL_TOKEN, STORE, URL_AUTH_SUZ, URL_TOKEN_SUZ, OMSID
 from config import LOGGER as log
+from config import SERIAL, URL_AUTH, URL_TOKEN, STORE
+from logger import log, cleanup_logs, logs_path
 from models import Token
 from database import session_maker
 
@@ -49,6 +51,7 @@ def get_token_info(token: str, token_info: dict, token_type: int):
 
 
 def get_token(token_type: int):
+
     log.info(f'CZ. Start - {datetime.now()}. TYPE {token_type}')
 
     CADES_BES = 1
@@ -59,6 +62,7 @@ def get_token(token_type: int):
 
     sSerialNumber = SERIAL
 
+    log.info(f'Auth {URL_AUTH}')
     headers = {'accept': 'application/json'}
 
     if token_type == 0:
@@ -80,39 +84,51 @@ def get_token(token_type: int):
 
     encoded_data = base64.b64encode(data.encode('ascii'))
 
-    oStore = win32com.client.Dispatch("CAdESCOM.Store")
-    oStore.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
-    oCert = ''
-    for val in oStore.Certificates:
-        if val.SerialNumber == sSerialNumber:
-            oCert = val
-    oStore.Close
+    try:
+        log.info(f'Getting certificate {sSerialNumber} in store {STORE}')
+        oStore = win32com.client.Dispatch("CAdESCOM.Store")
+        oStore.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+        oCert = ''
+        for val in oStore.Certificates:
+            if val.SerialNumber == sSerialNumber:
+                oCert = val
+        oStore.Close
+        log.info(f'Get certificate {sSerialNumber}')
+    except Exception as e:
+        log.error(f"Error getting certificate {sSerialNumber} in store {STORE}")
 
-    oCPSigner = win32com.client.Dispatch("CAdESCOM.CPSigner")
-    oSignedData = win32com.client.Dispatch("CAdESCOM.CadesSignedData")
 
-    oCPSigner.Certificate = oCert
-    oSignedData.ContentEncoding = 1
+    try:
+        log.info(f'Signing data with certificate {sSerialNumber}')
+        oCPSigner = win32com.client.Dispatch("CAdESCOM.CPSigner")
+        oSignedData = win32com.client.Dispatch("CAdESCOM.CadesSignedData")
 
-    base64_message = encoded_data.decode('ascii')
-    oSignedData.Content = base64_message
+        oCPSigner.Certificate = oCert
+        oSignedData.ContentEncoding = 1
 
-    sSignedData = oSignedData.SignCades(oCPSigner, CADES_BES, False, CAPICOM_ENCODE_BASE64)
+        base64_message = encoded_data.decode('ascii')
+        oSignedData.Content = base64_message
 
-    headers = {'accept': 'application/json',
-               'Content-Type': 'application/json'
-               }
+        sSignedData = oSignedData.SignCades(oCPSigner, CADES_BES, False, CAPICOM_ENCODE_BASE64)
 
-    params = {
-        'uuid': content['uuid'],
-        'data': sSignedData
-    }
+        headers = {'accept': 'application/json',
+                   'Content-Type': 'application/json'
+                   }
+
+        params = {
+            'uuid': content['uuid'],
+            'data': sSignedData
+        }
+
+    except Exception as e:
+        log.error(f'Error signing data: {e}. ')
 
     if token_type == 0:
         post_url = URL_TOKEN
     else:
         post_url = f'{URL_TOKEN_SUZ}/{OMSID}'
 
+    log.info(f'Getting token {post_url}')
     response = requests.post(post_url, headers=headers, json=params)
 
     status = response.status_code
@@ -127,9 +143,17 @@ def get_token(token_type: int):
         'jwt_token': content['token']
     }
 
-    get_token_info(token_info['jwt_token'], token_info, token_type)
+    try:
+        log.info("Getting info from JWT")
+        get_token_info(token_info['jwt_token'], token_info, token_type)
+    except Exception as e:
+        log.error(f"Error while reading JWT: {e}")
 
-    save_token(token_info, token_type)
+     try:
+        log.info("Saving info in database")
+        save_token(token_info)
+    except Exception as e:
+        log.error("Error saving info in database: {e}")
 
     log.info(f'CZ. Stop -  {datetime.now()}. TYPE {token_type}')
 
@@ -138,3 +162,5 @@ if __name__ == '__main__':
     # 0 - cz token, 1 - suz token
     get_token(0)
     get_token(1)
+    cleanup_logs(logs_path)
+
