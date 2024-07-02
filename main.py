@@ -17,7 +17,6 @@ session = session_maker()
 
 
 def save_token(token_info: dict, token_type: int):
-
     stmp_type = 'CZ' if token_type == 0 else 'SUZ'
 
     stmt = delete(Token).where(Token.token_type == stmp_type)
@@ -51,7 +50,6 @@ def get_token_info(token: str, token_info: dict, token_type: int):
 
 
 def get_token(token_type: int):
-
     log.info(f'CZ. Start - {datetime.now()}. TYPE {token_type}')
 
     CADES_BES = 1
@@ -96,7 +94,6 @@ def get_token(token_type: int):
         log.info(f'Get certificate {sSerialNumber}')
     except Exception as e:
         log.error(f"Error getting certificate {sSerialNumber} in store {STORE}")
-
 
     try:
         log.info(f'Signing data with certificate {sSerialNumber}')
@@ -149,7 +146,7 @@ def get_token(token_type: int):
     except Exception as e:
         log.error(f"Error while reading JWT: {e}")
 
-     try:
+    try:
         log.info("Saving info in database")
         save_token(token_info)
     except Exception as e:
@@ -163,4 +160,3 @@ if __name__ == '__main__':
     get_token(0)
     get_token(1)
     cleanup_logs(logs_path)
-
